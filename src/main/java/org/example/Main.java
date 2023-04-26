@@ -10,12 +10,14 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.InputMismatchException;
 import java.util.Scanner;
 
 public class Main {
     private static Scanner sc = new Scanner(System.in).useDelimiter("\n");
     private static Conexion conexion = new Conexion("localhost", "root", "root", "ejercicio_final");
-
+    private static HashMap<String, ArrayList<String>> hmMaterias = new HashMap<>();
+    private static HashMap<String, ArrayList<String>> hmMateriasAprobadas = new HashMap<>();
     public static void main(String[] args) throws SQLException, JsonProcessingException {
 
         boolean salir = true;
@@ -24,7 +26,7 @@ public class Main {
             System.out.println("Seleccione una opción:");
             System.out.println("1. Crear materia");
             System.out.println("2. Agregar alumno");
-            System.out.println("3. Validar la inscripción");
+            System.out.println("3. Traer datos");
             System.out.println("4. Salir");
 
             int opcion = sc.nextInt();
@@ -38,18 +40,28 @@ public class Main {
                     agregarAlumno();
                     break;
                 case 3:
-                    validarInscripcion();
-                    break;
-                case 4:
                     traerDatos();
                     break;
-                case 5:
+                case 4:
                     salir = false;
                     break;
             }
         }
+            // si quiero validar la inscripcion debo hacerlo por aca ya que el metodo es booleano y no me permite
+            // agregarlo al menu de opciones
+        try {
+            traerDatos();
+            boolean inscripcionValida = validarInscripcion("cele", "fisica II");
+            if (inscripcionValida) {
+                System.out.println("cele puede inscribirse en fisica II.");
+            } else {
+                System.out.println("cele no puede inscribirse en fisica II.");
+            }
+        } catch (SQLException | JsonProcessingException e) {
+            e.printStackTrace();
+        }
 
-        traerDatos();
+
     }
 
     public static void crearMateria() throws SQLException {
@@ -83,11 +95,20 @@ public class Main {
         System.out.println("Cuál es el nombre del alumno?");
         String nombre = sc.next();
         alumno.setNombre(nombre);
-        System.out.println("Cuál es el número de legajo?");
-        Integer legajo = sc.nextInt();
-        if (!Integer.toString(legajo).matches("^[0-9]{5}$")) {
-            System.out.println("El número de legajo debe tener 5 dígitos numéricos.");
-            return;
+        Integer legajo = null;
+        while (legajo == null || !Integer.toString(legajo).matches("^[0-9]{5}$")) {
+            System.out.println("Cuál es el número de legajo?");
+            try {
+                legajo = sc.nextInt();
+                sc.nextLine();
+            } catch (InputMismatchException e) {
+                System.out.println("Debe ingresar un número de legajo válido.");
+                sc.next();
+                continue;
+            }
+            if (!Integer.toString(legajo).matches("^[0-9]{5}$")) {
+                System.out.println("El número de legajo debe tener 5 dígitos numéricos.");
+            }
         }
         alumno.setLegajo(legajo);
         System.out.println("Cuantas materias aprobadas tiene?");
@@ -111,8 +132,17 @@ public class Main {
         }
     }
 
-    public static void validarInscripcion() throws SQLException {
-
+    public static boolean validarInscripcion(String nombreAlumno, String nombreMateria) {
+        ArrayList<String> materiasAprobadas = hmMateriasAprobadas.get(nombreAlumno);
+        ArrayList<String> correlativasMateria = hmMaterias.get(nombreMateria);
+        if (correlativasMateria != null) {
+            for (String correlativa : correlativasMateria) {
+                if (!materiasAprobadas.contains(correlativa)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     public static void traerDatos() throws SQLException, JsonProcessingException {
@@ -120,8 +150,6 @@ public class Main {
         Alumno alumno = new Alumno();
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY);
-        HashMap<String, ArrayList<String>> hmMaterias = new HashMap<>();
-        HashMap<String, ArrayList<String>> hmMateriasAprobadas = new HashMap<>();
         try {
             conexion.conectar();
             System.out.println("Conexión exitosa a la base de datos");
@@ -149,62 +177,4 @@ public class Main {
         }
     }
 }
-
-    /*      //stmt.setString(1, alumno.getNombre());
-            //stmt.setInt(2, alumno.getLegajo());
-            //stmt.setString(3, String.join(",", alumno.getMateriasAprobadas()));
-            //stmt.setString(1, materia.getNombre());
-            //stmt.setString(2, String.join(",", materia.getCorrelativas()));
-       public static boolean cumpleCorrelativas(ArrayList<String> materiasAprobadas, ArrayList<String> correlativas) {
-        for (String correlativa : correlativas) {
-            if (!materiasAprobadas.contains(correlativa)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    public static void validarInscripcion() throws SQLException {
-        System.out.println("A qué materia desea inscribirse?");
-        String nombreMateria = sc.next();
-        Materia materia = buscarMateria(nombreMateria);
-        if (materia == null) {
-            System.out.println("No se encontró la materia " + nombreMateria);
-            return;
-        }
-        System.out.println("Coloque el legajo del alumno que desea inscribir a la materia");
-        int legajo = sc.nextInt();
-        Alumno alumno = buscarAlumno(legajo);
-        if (alumno == null) {
-            System.out.println("No se encontró el alumno con legajo " + legajo);
-            return;
-        }
-        if (cumpleCorrelativas(alumno.getMateriasAprobadas(), materia.getCorrelativas())) {
-            System.out.println("El alumno " + alumno.getNombre() + " puede inscribirse a la materia " + nombreMateria);
-        } else {
-            System.out.println("El alumno " + alumno.getNombre() + " no puede inscribirse a la materia " + nombreMateria + " por no cumplir con las correlativas necesarias");
-        }
-    }
-
-    static ArrayList<Alumno> alumnos = new ArrayList<>();
-
-    public static Alumno buscarAlumno(int legajo) {
-        for (Alumno alumno : alumnos) {
-            if (alumno.getLegajo() == legajo) {
-                return alumno;
-            }
-        }
-        return null;
-    }
-
-    static ArrayList<Materia> materias = new ArrayList<>();
-
-    public static Materia buscarMateria(String nombre) {
-        for (Materia materia : materias) {
-            if (materia.getNombre().equalsIgnoreCase(nombre)) {
-                return materia;
-            }
-        }
-        return null;
-    }*/
 
