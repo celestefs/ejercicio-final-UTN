@@ -10,6 +10,10 @@ public class Alumno {
 
     public Alumno(){}
 
+    public Alumno(String nombre){
+        this.nombre = nombre;
+    }
+
     public Alumno(String nombre, int legajo) {
         this.nombre = nombre;
         this.legajo = legajo;

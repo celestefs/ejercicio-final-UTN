@@ -1,15 +1,22 @@
 package org.example;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
+
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Scanner;
 
 public class Main {
     private static Scanner sc = new Scanner(System.in).useDelimiter("\n");
-    private static Conexion conexion = new Conexion();
+    private static Conexion conexion = new Conexion("localhost", "root", "root", "ejercicio_final");
 
-    public static void main(String[] args) throws SQLException {
+    public static void main(String[] args) throws SQLException, JsonProcessingException {
 
         boolean salir = true;
 
@@ -34,12 +41,15 @@ public class Main {
                     validarInscripcion();
                     break;
                 case 4:
+                    traerDatos();
+                    break;
+                case 5:
                     salir = false;
                     break;
             }
         }
 
-
+        traerDatos();
     }
 
     public static void crearMateria() throws SQLException {
@@ -56,12 +66,16 @@ public class Main {
             input = sc.next();
             correlativas.add(input);
         }
-        conexion.estableceConexion();
-        PreparedStatement stmt = conexion.conectar.prepareStatement("INSERT INTO materias (nombre, correlativas) VALUES (?, ?)");
-        stmt.setString(1, nombre);
-        stmt.setString(2, String.join(",", correlativas));
-        stmt.executeUpdate();
-        conexion.cerrarConexion();
+        String correlativasJson = new Gson().toJson(correlativas);
+        try {
+            conexion.conectar();
+            System.out.println("Conexión exitosa a la base de datos");
+            PreparedStatement stmt = conexion.ejecutarUpdate("INSERT INTO materias (nombre, correlativas) VALUES ('" + nombre + "', '" + correlativasJson + "');");
+            System.out.println("Materia ingresada correctamente");
+            conexion.desconectar();
+        } catch (SQLException e) {
+            System.err.println("Error al cerrar la conexión: " + e.getMessage());
+        }
     }
 
     public static void agregarAlumno() throws SQLException {
@@ -71,7 +85,7 @@ public class Main {
         alumno.setNombre(nombre);
         System.out.println("Cuál es el número de legajo?");
         Integer legajo = sc.nextInt();
-        if (!legajo.equals("^[0-9]{5}$")) {
+        if (!Integer.toString(legajo).matches("^[0-9]{5}$")) {
             System.out.println("El número de legajo debe tener 5 dígitos numéricos.");
             return;
         }
@@ -85,16 +99,63 @@ public class Main {
             input = sc.next();
             materiasAprobadas.add(input);
         }
-        conexion.estableceConexion();
-        PreparedStatement stmt = conexion.conectar.prepareStatement("INSERT INTO alumnos (nombre, legajo, materias aprobadas) VALUES (?, ?, ?)");
-        stmt.setString(1, nombre);
-        stmt.setInt(2, legajo);
-        stmt.setString(3, String.join(",", materiasAprobadas));
-        stmt.executeUpdate();
-        conexion.cerrarConexion();
+        String materiasAprobadasJson = new Gson().toJson(materiasAprobadas);
+        try {
+            conexion.conectar();
+            System.out.println("Conexión exitosa a la base de datos");
+            PreparedStatement stmt = conexion.ejecutarUpdate("INSERT INTO alumnos (nombre, legajo, materias_aprobadas) VALUES ('" + nombre + "', '" + legajo + "', '" + materiasAprobadasJson + "');");
+            System.out.println("Alumno ingresado correctamente");
+            conexion.desconectar();
+        } catch (SQLException e) {
+            System.err.println("Error al cerrar la conexión: " + e.getMessage());
+        }
     }
 
-    public static boolean cumpleCorrelativas(ArrayList<String> materiasAprobadas, ArrayList<String> correlativas) {
+    public static void validarInscripcion() throws SQLException {
+
+    }
+
+    public static void traerDatos() throws SQLException, JsonProcessingException {
+        Materia materia = new Materia();
+        Alumno alumno = new Alumno();
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY);
+        HashMap<String, ArrayList<String>> hmMaterias = new HashMap<>();
+        HashMap<String, ArrayList<String>> hmMateriasAprobadas = new HashMap<>();
+        try {
+            conexion.conectar();
+            System.out.println("Conexión exitosa a la base de datos");
+            ResultSet rs = conexion.ejecutarConsulta("SELECT * FROM materias");
+            while (rs.next()) {
+                materia = new Materia(rs.getString("nombre"));
+                String jsonText = objectMapper.writeValueAsString(rs.getString("correlativas"));
+                ArrayList<String> nombreCorrelativas = objectMapper.readValue(jsonText, ArrayList.class);
+                materia.setCorrelativas(nombreCorrelativas);
+                hmMaterias.put(materia.getNombre(), materia.getCorrelativas());
+            }
+            ResultSet rs2 = conexion.ejecutarConsulta("SELECT * FROM alumnos");
+            while (rs2.next()) {
+                alumno = new Alumno(rs2.getString("nombre"));
+                String jsonText = objectMapper.writeValueAsString(rs2.getString("materias_aprobadas"));
+                ArrayList<String> nombreAprobadas = objectMapper.readValue(jsonText, ArrayList.class);
+                alumno.setMateriasAprobadas(nombreAprobadas);
+                hmMateriasAprobadas.put(alumno.getNombre(), alumno.getMateriasAprobadas());
+            }
+            conexion.desconectar();
+            System.out.println(hmMaterias);
+            System.out.println(hmMateriasAprobadas);
+            } catch (SQLException e) {
+
+        }
+    }
+}
+
+    /*      //stmt.setString(1, alumno.getNombre());
+            //stmt.setInt(2, alumno.getLegajo());
+            //stmt.setString(3, String.join(",", alumno.getMateriasAprobadas()));
+            //stmt.setString(1, materia.getNombre());
+            //stmt.setString(2, String.join(",", materia.getCorrelativas()));
+       public static boolean cumpleCorrelativas(ArrayList<String> materiasAprobadas, ArrayList<String> correlativas) {
         for (String correlativa : correlativas) {
             if (!materiasAprobadas.contains(correlativa)) {
                 return false;
@@ -145,15 +206,5 @@ public class Main {
             }
         }
         return null;
-    }
-}
-
-    /*
-    con el numero del legajo preguntar a que materia desea inscribirse el alumno,
-    y corroborar con el legajo si puede o no segun sus materias aprobadas
-
-    tengo que envolver el menu en establecer conexion y cerrar conexion para que guarde los datos en la db?
-
-    falta json y gson: crear objetos materias y alumnos y hacerlo manualmente
-    */
+    }*/
 
