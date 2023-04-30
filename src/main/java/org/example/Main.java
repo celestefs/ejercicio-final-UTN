@@ -18,6 +18,7 @@ public class Main {
     private static Conexion conexion = new Conexion("localhost", "root", "root", "ejercicio_final");
     private static HashMap<String, ArrayList<String>> hmMaterias = new HashMap<>();
     private static HashMap<String, ArrayList<String>> hmMateriasAprobadas = new HashMap<>();
+
     public static void main(String[] args) throws SQLException, JsonProcessingException {
 
         boolean salir = true;
@@ -26,7 +27,7 @@ public class Main {
             System.out.println("Seleccione una opción:");
             System.out.println("1. Crear materia");
             System.out.println("2. Agregar alumno");
-            System.out.println("3. Traer datos");
+            System.out.println("3. Validar Inscripción");
             System.out.println("4. Salir");
 
             int opcion = sc.nextInt();
@@ -45,22 +46,11 @@ public class Main {
                 case 4:
                     salir = false;
                     break;
+                default:
+                    System.out.println("Opción no válida.");
+                    break;
             }
         }
-            // si quiero validar la inscripcion debo hacerlo por aca ya que el metodo es booleano y no me permite
-            // agregarlo al menu de opciones
-        try {
-            traerDatos();
-            boolean inscripcionValida = validarInscripcion("cele", "fisica II");
-            if (inscripcionValida) {
-                System.out.println("cele puede inscribirse en fisica II.");
-            } else {
-                System.out.println("cele no puede inscribirse en fisica II.");
-            }
-        } catch (SQLException | JsonProcessingException e) {
-            e.printStackTrace();
-        }
-
 
     }
 
@@ -169,9 +159,16 @@ public class Main {
                 alumno.setMateriasAprobadas(nombreAprobadas);
                 hmMateriasAprobadas.put(alumno.getNombre(), alumno.getMateriasAprobadas());
             }
+            System.out.println("Ingrese el nombre del alumno:");
+            String nombreAlumno = sc.nextLine();
+            System.out.println("Ingrese el nombre de la materia:");
+            String nombreMateria = sc.nextLine();
+            if (validarInscripcion(nombreAlumno, nombreMateria)) {
+                System.out.println("El alumno cumple con las correlativas necesarias para inscribirse en la materia.");
+            } else {
+                System.out.println("El alumno no cumple con las correlativas necesarias para inscribirse en la materia.");
+            }
             conexion.desconectar();
-            System.out.println(hmMaterias);
-            System.out.println(hmMateriasAprobadas);
             } catch (SQLException e) {
 
         }
